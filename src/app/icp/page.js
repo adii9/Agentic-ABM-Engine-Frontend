@@ -58,7 +58,8 @@ export default function IcpSettings() {
   return (
     <main className={styles.main}>
       <nav className={styles.navBar}>
-        <Link href="/" className={styles.navLink}>Campaigns</Link>
+        <Link href="/" className={styles.navLink}>Dashboard</Link>
+        <Link href="/new-campaign" className={styles.navLink}>New Campaign</Link>
         <Link href="/icp" className={`${styles.navLink} ${styles.navLinkActive}`}>ICP Rules</Link>
       </nav>
 

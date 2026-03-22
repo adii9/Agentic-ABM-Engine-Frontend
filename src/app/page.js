@@ -72,25 +72,6 @@ export default function Home() {
     return Array.from(map.values()).sort((a, b) => new Date(b.lastUpdated) - new Date(a.lastUpdated));
   }, [states]);
 
-  const handleKickoff = async () => {
-    try {
-      setKickoffLoading(true);
-      const res = await fetch("/api/kickoff", { method: "POST" });
-      const data = await res.json();
-      
-      if (data.success) {
-        showToast("CrewAI Kickoff Initiated!");
-        setTimeout(fetchStates, 2000); 
-      } else {
-        showToast("Kickoff failed: " + data.error, true);
-      }
-    } catch (error) {
-      showToast("Error executing kickoff", true);
-    } finally {
-      setKickoffLoading(false);
-    }
-  };
-
   const showToast = (message, isError = false) => {
     setToast({ message, isError });
     setTimeout(() => setToast(null), 5000);
@@ -116,7 +97,8 @@ export default function Home() {
   return (
     <main className={styles.main}>
       <nav className={styles.navBar}>
-        <Link href="/" className={`${styles.navLink} ${styles.navLinkActive}`}>Campaigns</Link>
+        <Link href="/" className={`${styles.navLink} ${styles.navLinkActive}`}>Dashboard</Link>
+        <Link href="/new-campaign" className={styles.navLink}>New Campaign</Link>
         <Link href="/icp" className={styles.navLink}>ICP Rules</Link>
       </nav>
 
@@ -126,20 +108,6 @@ export default function Home() {
           Execute, monitor, and scale your autonomous marketing workforce in real-time.
         </p>
       </header>
-
-      <div className={styles.actions}>
-        <button 
-          className={styles.kickoffBtn} 
-          onClick={handleKickoff}
-          disabled={kickoffLoading}
-        >
-          {kickoffLoading ? (
-            <><span className={styles.spinner}></span> Initiating...</>
-          ) : (
-            "Kickoff Agent Workflow"
-          )}
-        </button>
-      </div>
 
       <section className={styles.glassContainer}>
         <div className={styles.sectionHeader}>
@@ -273,32 +241,76 @@ export default function Home() {
               )}
 
               {/* Final Content */}
-              {Object.keys(selectedFlow.fullState.final_content || {}).length > 0 && (
-                <div className={styles.dataCard}>
-                  <h3 className={styles.dataCardTitle}>📝 Final Output</h3>
-                  
-                  {selectedFlow.fullState.final_content.engagement_plan && (
-                    <div style={{ marginBottom: "1.5rem" }}>
-                      <strong style={{ display: 'block', marginBottom: '0.5rem', color: '#fff' }}>Engagement Plan</strong>
-                      <div 
-                        className={styles.dataText} 
-                        dangerouslySetInnerHTML={formatMarkdown(selectedFlow.fullState.final_content.engagement_plan)}
-                      />
+              {selectedFlow.fullState.final_content && Object.keys(selectedFlow.fullState.final_content || {}).length > 0 && (() => {
+                const finalObj = selectedFlow.fullState.final_content;
+                
+                // Fast path if LLM returned a raw string instead of a JSON object
+                if (typeof finalObj === 'string') {
+                  return (
+                    <div className={styles.dataCard}>
+                      <h3 className={styles.dataCardTitle}>📝 Final Output</h3>
+                      <div style={{ marginBottom: "1.5rem" }}>
+                        <strong style={{ display: 'block', marginBottom: '0.5rem', color: '#fff' }}>Generated Response</strong>
+                        <div 
+                          className={styles.dataText} 
+                          style={{ background: 'rgba(255,255,255,0.05)', padding: '1rem', borderRadius: '8px', borderLeft: '4px solid #6366f1' }}
+                          dangerouslySetInnerHTML={formatMarkdown(finalObj)}
+                        />
+                      </div>
                     </div>
-                  )}
+                  );
+                }
 
-                  {selectedFlow.fullState.final_content.outreach_email && (
-                    <div>
-                      <strong style={{ display: 'block', marginBottom: '0.5rem', color: '#fff' }}>Generated Email</strong>
-                      <div 
-                        className={styles.dataText} 
-                        style={{ background: 'rgba(255,255,255,0.05)', padding: '1rem', borderRadius: '8px', borderLeft: '4px solid #6366f1' }}
-                        dangerouslySetInnerHTML={formatMarkdown(selectedFlow.fullState.final_content.outreach_email)}
-                      />
-                    </div>
-                  )}
-                </div>
-              )}
+                // Look for common keys associated with outreach emails and plans
+                const emailKey = Object.keys(finalObj).find(k => /email|draft|message|outreach/i.test(k));
+                const planKey = Object.keys(finalObj).find(k => /plan|strategy|engagement/i.test(k) && k !== emailKey);
+                
+                // Fallback: If no email or plan key is found, grab the first string that has substance
+                const fallbackKey = (!emailKey && !planKey) ? Object.keys(finalObj).find(k => typeof finalObj[k] === 'string' && finalObj[k].length > 10) : null;
+                
+                const hasMatch = emailKey || planKey || fallbackKey;
+                if (!hasMatch) return null; // Avoid rendering empty cards if keys are nested useless objects
+
+                return (
+                  <div className={styles.dataCard}>
+                    <h3 className={styles.dataCardTitle}>📝 Final Output</h3>
+                    
+                    {emailKey && finalObj[emailKey] && (
+                      <div style={{ marginBottom: "1.5rem" }}>
+                        <strong style={{ display: 'block', marginBottom: '0.5rem', color: '#fff' }}>Generated Email</strong>
+                        <div 
+                          className={styles.dataText} 
+                          style={{ background: 'rgba(255,255,255,0.05)', padding: '1rem', borderRadius: '8px', borderLeft: '4px solid #6366f1' }}
+                          dangerouslySetInnerHTML={formatMarkdown(typeof finalObj[emailKey] === 'string' ? finalObj[emailKey] : JSON.stringify(finalObj[emailKey]))}
+                        />
+                      </div>
+                    )}
+                    
+                    {!emailKey && planKey && finalObj[planKey] && (
+                      <div style={{ marginBottom: "1.5rem" }}>
+                        <strong style={{ display: 'block', marginBottom: '0.5rem', color: '#fff' }}>Engagement Plan / Output</strong>
+                        <div 
+                          className={styles.dataText} 
+                          dangerouslySetInnerHTML={formatMarkdown(typeof finalObj[planKey] === 'string' ? finalObj[planKey] : JSON.stringify(finalObj[planKey]))}
+                        />
+                      </div>
+                    )}
+
+                    {!emailKey && !planKey && fallbackKey && finalObj[fallbackKey] && (
+                      <div style={{ marginBottom: "1.5rem" }}>
+                        <strong style={{ display: 'block', marginBottom: '0.5rem', color: '#fff', textTransform: 'capitalize' }}>
+                          {fallbackKey.replace(/_/g, ' ')}
+                        </strong>
+                        <div 
+                          className={styles.dataText} 
+                          style={{ background: 'rgba(255,255,255,0.05)', padding: '1rem', borderRadius: '8px', borderLeft: '4px solid #6366f1' }}
+                          dangerouslySetInnerHTML={formatMarkdown(typeof finalObj[fallbackKey] === 'string' ? finalObj[fallbackKey] : JSON.stringify(finalObj[fallbackKey]))}
+                        />
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           </div>
         </div>
