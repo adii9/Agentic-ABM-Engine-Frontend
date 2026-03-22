@@ -4,6 +4,13 @@ import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import styles from "./page.module.css";
 
+const STAGE_MAP = {
+  qualify_account: "🔍 Qualifying Account",
+  handle_rejection: "❌ Account Disqualified",
+  research_account: "🧠 Deep Research",
+  generate_content: "✍️ Drafting Output"
+};
+
 export default function Home() {
   const [states, setStates] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -37,36 +44,66 @@ export default function Home() {
     return () => clearInterval(interval);
   }, []);
 
-  // Process data into distinct flow runs
+  // Process data into distinct flow  // Group by flow_uuid to show only the latest state per run
   const flows = useMemo(() => {
     const map = new Map();
     states.forEach(state => {
-      if (!map.has(state.flow_uuid)) {
-        map.set(state.flow_uuid, {
-          uuid: state.flow_uuid,
-          latestMethod: state.method_name,
+      // Create a unique key using flow_uuid or timestamp if uuid missing
+      const key = state.flow_uuid || state.timestamp;
+      
+      if (!map.has(key)) {
+        map.set(key, {
+          uuid: String(key),
           companyName: state.state_json?.company_name || null,
           lastUpdated: state.timestamp,
-          // If the final_content object exists and has keys, or if method is a known terminal method.
-          isCompleted: state.method_name === 'generate_content' && Object.keys(state.state_json?.final_content || {}).length > 0,
+          isCompleted: (state.method_name === 'generate_content' && Object.keys(state.state_json?.final_content || {}).length > 0) || state.method_name === 'handle_rejection',
           fullState: state.state_json,
+          methodName: state.method_name,
           history: []
         });
       }
-      map.get(state.flow_uuid).history.push(state);
+      
+      const entry = map.get(key);
+
+      // If the newest DB record didn't have a method name, steal it from this older record
+      if (!entry.methodName && state.method_name) {
+        entry.methodName = state.method_name;
+      }
+
+      // If newest record wasn't visibly completed but an older one was
+      if (!entry.isCompleted) {
+        entry.isCompleted = (state.method_name === 'generate_content' && Object.keys(state.state_json?.final_content || {}).length > 0) || state.method_name === 'handle_rejection';
+      }
       
       // Fallback: If we don't have company name yet, look historically
-      if (!map.get(state.flow_uuid).companyName && state.state_json?.company_name) {
-        map.get(state.flow_uuid).companyName = state.state_json.company_name;
+      if (!entry.companyName && state.state_json?.company_name) {
+        entry.companyName = state.state_json.company_name;
       }
       
-      // Merge state properties incrementally giving preference to latest
-      if (!map.get(state.flow_uuid).fullState.buying_committee && state.state_json?.buying_committee) {
-        map.get(state.flow_uuid).fullState.buying_committee = state.state_json.buying_committee;
+      // Merge state properties incrementally giving preference to latest (which means don't overwrite if entry already has it, because entry is newest)
+      if (!entry.fullState?.buying_committee && state.state_json?.buying_committee) {
+        entry.fullState.buying_committee = state.state_json.buying_committee;
       }
-      if (!map.get(state.flow_uuid).fullState.trigger_event && state.state_json?.trigger_event) {
-        map.get(state.flow_uuid).fullState.trigger_event = state.state_json.trigger_event;
+      if (!entry.fullState?.trigger_event && state.state_json?.trigger_event) {
+        entry.fullState.trigger_event = state.state_json.trigger_event;
       }
+      
+      // Update with the most recent timestamp seen (in case the array isn't strictly newest-first)
+      if (new Date(state.timestamp) > new Date(entry.lastUpdated)) {
+        entry.lastUpdated = state.timestamp;
+        
+        // Spread the fullState, but state.state_json will overwrite older keys. This ensures the absolute newest keys persist.
+        entry.fullState = { ...entry.fullState, ...state.state_json };
+        
+        if (state.method_name) {
+          entry.methodName = state.method_name;
+        }
+        
+        const isNowCompleted = (state.method_name === 'generate_content' && Object.keys(state.state_json?.final_content || {}).length > 0) || state.method_name === 'handle_rejection';
+        entry.isCompleted = entry.isCompleted || isNowCompleted;
+      }
+      
+      entry.history.push(state);
     });
 
     return Array.from(map.values()).sort((a, b) => new Date(b.lastUpdated) - new Date(a.lastUpdated));
@@ -108,6 +145,32 @@ export default function Home() {
           Execute, monitor, and scale your autonomous marketing workforce in real-time.
         </p>
       </header>
+
+      <div className={styles.processContainer}>
+        <div className={styles.processStep}>
+          <div className={styles.processIcon}>🔍</div>
+          <div className={styles.processText}>
+            <strong>1. ICP Match</strong>
+            <span>Qualify accounts instantly</span>
+          </div>
+        </div>
+        <div className={styles.processArrow}>→</div>
+        <div className={styles.processStep}>
+          <div className={styles.processIcon}>🧠</div>
+          <div className={styles.processText}>
+            <strong>2. Deep Research</strong>
+            <span>Analyze decision makers</span>
+          </div>
+        </div>
+        <div className={styles.processArrow}>→</div>
+        <div className={styles.processStep}>
+          <div className={styles.processIcon}>✍️</div>
+          <div className={styles.processText}>
+            <strong>3. Engagement</strong>
+            <span>Draft hyper-personalized outbound</span>
+          </div>
+        </div>
+      </div>
 
       <section className={styles.glassContainer}>
         <div className={styles.sectionHeader}>
@@ -163,7 +226,7 @@ export default function Home() {
                     </td>
                     <td>
                       <span className={styles.stepBadge}>
-                        {flow.latestMethod.replace(/_/g, ' ')}
+                        {flow.methodName ? (STAGE_MAP[flow.methodName] || flow.methodName.replace(/_/g, ' ')) : 'Initializing...'}
                       </span>
                     </td>
                     <td style={{ color: 'var(--text-secondary)' }}>
@@ -210,6 +273,12 @@ export default function Home() {
                   <span className={`${styles.fitBadge} ${!selectedFlow.fullState.icp_fit ? styles.fitBadgeFalse : ''}`} style={{ marginLeft: "10px" }}>
                     {selectedFlow.fullState.icp_fit ? 'Valid ICP Fit' : 'Disqualified'}
                   </span>
+                </div>
+                <div>
+                  <div className={styles.dataLabel}>Current Stage</div>
+                  <div className={styles.dataValue} style={{ color: '#fff' }}>
+                    {STAGE_MAP[selectedFlow.methodName] || selectedFlow.methodName || 'Unknown'}
+                  </div>
                 </div>
                 {selectedFlow.fullState.rejection_reason && (
                   <p className={styles.dataText} style={{ color: '#f87171' }}>
@@ -311,6 +380,44 @@ export default function Home() {
                   </div>
                 );
               })()}
+
+              {/* Usage Metrics (Advanced Details) */}
+              {selectedFlow.fullState.usage_metrics && Object.keys(selectedFlow.fullState.usage_metrics).length > 0 && (
+                <div className={styles.dataCard}>
+                  <h3 className={styles.dataCardTitle}>📊 Advanced Details (Usage Metrics)</h3>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '1rem' }}>
+                    
+                    <div style={{ background: 'rgba(255,255,255,0.05)', padding: '1rem', borderRadius: '12px', textAlign: 'center', border: '1px solid rgba(255,255,255,0.1)' }}>
+                      <div style={{ fontSize: '0.75rem', color: '#a1a1aa', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: '600' }}>Total Tokens</div>
+                      <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#10b981' }}>
+                        {selectedFlow.fullState.usage_metrics.total_tokens?.toLocaleString() || 0}
+                      </div>
+                    </div>
+
+                    <div style={{ background: 'rgba(255,255,255,0.05)', padding: '1rem', borderRadius: '12px', textAlign: 'center', border: '1px solid rgba(255,255,255,0.1)' }}>
+                      <div style={{ fontSize: '0.75rem', color: '#a1a1aa', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: '600' }}>Prompt Tokens</div>
+                      <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#fff' }}>
+                        {selectedFlow.fullState.usage_metrics.prompt_tokens?.toLocaleString() || 0}
+                      </div>
+                    </div>
+
+                    <div style={{ background: 'rgba(255,255,255,0.05)', padding: '1rem', borderRadius: '12px', textAlign: 'center', border: '1px solid rgba(255,255,255,0.1)' }}>
+                      <div style={{ fontSize: '0.75rem', color: '#a1a1aa', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: '600' }}>Completion</div>
+                      <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#6366f1' }}>
+                        {selectedFlow.fullState.usage_metrics.completion_tokens?.toLocaleString() || 0}
+                      </div>
+                    </div>
+
+                    <div style={{ background: 'rgba(255,255,255,0.05)', padding: '1rem', borderRadius: '12px', textAlign: 'center', border: '1px solid rgba(255,255,255,0.1)' }}>
+                      <div style={{ fontSize: '0.75rem', color: '#a1a1aa', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: '600' }}>Requests</div>
+                      <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#fff' }}>
+                        {selectedFlow.fullState.usage_metrics.successful_requests?.toLocaleString() || 0}
+                      </div>
+                    </div>
+
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

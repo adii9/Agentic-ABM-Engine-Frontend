@@ -424,6 +424,70 @@
   padding: 1.5rem;
 }
 
+.dataCar.dataText h6 { font-size: 0.875rem; color: #a1a1aa; margin-top: 1rem; margin-bottom: 0.5rem; }
+.dataText strong { color: #fff; }
+
+.processContainer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--bg-glass);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border-glass);
+  border-radius: 20px;
+  padding: 1.5rem 2rem;
+  margin-bottom: 2rem;
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+}
+
+.processStep {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.processIcon {
+  font-size: 2rem;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 1rem;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.processText {
+  display: flex;
+  flex-direction: column;
+}
+
+.processText strong {
+  color: #fff;
+  font-size: 1.1rem;
+  margin-bottom: 0.25rem;
+}
+
+.processText span {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+}
+
+.processArrow {
+  color: var(--text-secondary);
+  font-size: 1.5rem;
+  opacity: 0.5;
+}
+
+@media (max-width: 768px) {
+  .processContainer {
+    flex-direction: column;
+    gap: 1.5rem;
+    align-items: flex-start;
+  }
+  .processArrow {
+    transform: rotate(90deg);
+    align-self: center;
+  }
+}
 .dataCardTitle {
   font-size: 1.125rem;
   color: var(--primary-glow);
