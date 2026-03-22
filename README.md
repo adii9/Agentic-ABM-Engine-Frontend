@@ -1,36 +1,54 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Agentic ABM Engine - Frontend
+
+A sleek, modern Next.js frontend built to interface with the Agentic ABM (Account-Based Marketing) Engine. This interface allows you to orchestrate autonomous marketing workflows run by CrewAI, visualize generated content in real-time, and live-edit Agent configurations.
+
+## Features
+
+- **Real-Time CRM Dashboard**: View active and completed AI agent campaigns. Groups steps logically and derives statuses dynamically from the CrewAI output.
+- **Smart Markdown Rendering**: Generates clean, readable AI outputs (like `**bolded targets**`) directly into beautifully formatted HTML cards for rapid review.
+- **Agent Kickoff**: Start the underlying Python CrewAI process (`uv run kickoff`) directly from the browser with a single click.
+- **Live ICP Configurator**: A built-in code editor view to dynamically adjust your Ideal Customer Profile (`icp.yaml`). The Agentic backend immediately utilizes these configurations without needing to restart.
+- **Premium Glassmorphism Design**: Developed purely with Vanilla CSS targeting high-end, animated aesthetics involving glassmorphism, glowing accents, and smooth transitions.
+
+## Tech Stack
+- **Framework**: Next.js 14+ (App Router)
+- **Styling**: Vanilla CSS (No Tailwind)
+- **Database Connection**: Reads directly from local SQLite (`better-sqlite3` equivalent via `sqlite3`) accessing `~/Library/Application Support/abm_engine/flow_states.db`.
+- **System Integration**: Uses Node.js `child_process.exec` to execute Python Agent workflows.
+
+## Prerequisites
+
+To run this application, it assumes you have the `abm_engine` configured locally on a Mac architecture, specifically looking for databases in:
+`~/Library/Application Support/abm_engine/flow_states.db`
+
+And the python project residing in:
+`~/Crew AI Builds/Marketing/Antigravity/abm_engine`
 
 ## Getting Started
 
-First, run the development server:
-
+1. Navigate to the project directory:
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cd frontend
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+2. Install dependencies:
+```bash
+npm install
+```
 
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
+3. Run the development server:
+```bash
+npm run dev
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+4. Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-## Learn More
+## Architecture & API Routes
 
-To learn more about Next.js, take a look at the following resources:
+- `GET /api/flow-states`: Fetches the top 100 most recent execution states from the SQLite database and parses them as JSON.
+- `POST /api/kickoff`: Triggers the `/abm_engine/` directory environment to execute `uv run kickoff` locally.
+- `GET/POST /api/icp`: Reads and writes directly to the `icp.yaml` configuration file allowing quick updates to agent logic. Let's make sure things run properly.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Contributing
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Designed specifically for the Agentic ABM architecture by the Antigravity system.
